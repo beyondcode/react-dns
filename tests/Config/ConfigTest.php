@@ -214,6 +214,25 @@ nameserver localhost
         $this->assertInstanceOf(Config::class, $config);
     }
 
+    public function testWmicReturnsEmptyWhenCommandFails()
+    {
+        // When WMIC is unavailable (Windows 11 24H2+), it returns empty
+        // This triggers the PowerShell fallback in loadSystemConfigBlocking()
+        $config = Config::loadWmicBlocking($this->echoCommand(''));
+
+        $this->assertEquals([], $config->nameservers);
+    }
+
+    public function testPowershellFallbackReturnsValidResults()
+    {
+        // PowerShell should return valid results when WMIC fails
+        // This verifies the fallback will work
+        $contents = "192.168.2.1\n8.8.8.8";
+        $config = Config::loadPowershellBlocking($this->echoCommand($contents));
+
+        $this->assertEquals(['192.168.2.1', '8.8.8.8'], $config->nameservers);
+    }
+
     public function testLoadsSingleEntryFromWmicOutput()
     {
         $contents = '
