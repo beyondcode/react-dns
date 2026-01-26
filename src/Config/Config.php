@@ -136,9 +136,17 @@ final class Config
         if ($contents !== null) {
             foreach (explode("\n", $contents) as $line) {
                 $ip = trim($line);
-                if ($ip !== '' && @inet_pton($ip) !== false) {
-                    $config->nameservers[] = $ip;
+                if ($ip === '' || @inet_pton($ip) === false) {
+                    continue;
                 }
+
+                // skip Windows placeholder DNS addresses (fec0:0:0:ffff::1, ::2, ::3)
+                // these are added to interfaces without explicit DNS configuration and don't resolve anything
+                if (preg_match('/^fec0:0:0:ffff::/i', $ip)) {
+                    continue;
+                }
+
+                $config->nameservers[] = $ip;
             }
             $config->nameservers = array_values(array_unique($config->nameservers));
         }

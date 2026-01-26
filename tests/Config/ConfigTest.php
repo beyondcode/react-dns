@@ -188,6 +188,17 @@ nameserver localhost
         $this->assertEquals($expected, $config->nameservers);
     }
 
+    public function testIgnoresWindowsPlaceholderDnsFromPowershellOutput()
+    {
+        // Windows uses fec0:0:0:ffff::1/2/3 as placeholder DNS for unconfigured interfaces
+        $contents = "fec0:0:0:ffff::1\nfec0:0:0:ffff::2\nfec0:0:0:ffff::3\n192.168.178.1\n8.8.8.8";
+        $expected = ['192.168.178.1', '8.8.8.8'];
+
+        $config = Config::loadPowershellBlocking($this->echoCommand($contents));
+
+        $this->assertEquals($expected, $config->nameservers);
+    }
+
     public function testLoadsFromWmicOnWindows()
     {
         if (DIRECTORY_SEPARATOR !== '\\') {
