@@ -28,14 +28,16 @@ final class Config
      */
     public static function loadSystemConfigBlocking()
     {
-        // Use PowerShell or WMIC on Windows
+        // Use WMIC or PowerShell on Windows
         if (DIRECTORY_SEPARATOR === '\\') {
-            $config = self::loadPowershellBlocking();
+            // try WMIC first (faster), fall back to PowerShell if WMIC is unavailable
+            // WMIC was removed in Windows 11 24H2+, but is faster where available
+            $config = self::loadWmicBlocking();
             if ($config->nameservers) {
                 return $config;
             }
 
-            return self::loadWmicBlocking();
+            return self::loadPowershellBlocking();
         }
 
         // otherwise (try to) load from resolv.conf
