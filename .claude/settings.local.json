@@ -1,0 +1,11 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(phpunit:*)",
+      "Bash(php -r:*)",
+      "Bash(gh api:*)",
+      "Bash(php:*)",
+      "WebSearch"
+    ]
+  }
+}

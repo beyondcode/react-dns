@@ -184,7 +184,7 @@ final class Config
      */
     public static function loadWmicBlocking($command = null)
     {
-        $contents = shell_exec($command === null ? 'wmic NICCONFIG get "DNSServerSearchOrder" /format:CSV' : $command);
+        $contents = shell_exec($command === null ? 'wmic NICCONFIG get "DNSServerSearchOrder" /format:CSV 2>nul' : $command);
         preg_match_all('/(?<=[{;,"])([\da-f.:]{4,})(?=[};,"])/i', $contents ?? '', $matches);
 
         $config = new self();
