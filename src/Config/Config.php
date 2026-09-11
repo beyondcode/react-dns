@@ -31,14 +31,20 @@ final class Config
         /* Use WMIC or PowerShell on Windows
          * WMIC is faster where available, but was removed in Windows 11 24H2+
          * PowerShell is slower, but is available on all Windows versions
+         *
+         * Only try WMIC if the executable actually exists, so we never spawn
+         * a missing command (which would print an error to STDERR and could
+         * be reported as a failure by the surrounding application).
          */
         if (DIRECTORY_SEPARATOR === '\\') {
-            $config = self::loadWmicBlocking();
-            if ($config->nameservers) {
-                return $config;
+            if (self::isWmicAvailable()) {
+                $config = self::loadWmicBlocking();
+                if ($config->nameservers) {
+                    return $config;
+                }
             }
 
-            return self::loadPowershellBlocking();;
+            return self::loadPowershellBlocking();
         }
 
         // otherwise (try to) load from resolv.conf
@@ -108,35 +114,35 @@ final class Config
         return $config;
     }
 
-      /**
-       * Loads the DNS configurations using Windows PowerShell
-       *
-       * Note that this method blocks while loading the given command and should
-       * thus be used with care! While this should be relatively fast for normal
-       * PowerShell commands, it remains unknown if this may block under certain
-       * circumstances. In particular, this method should only be executed before
-       * the loop starts, not while it is running.
-       *
-       * Note that this method will only try to execute the given command and try to
-       * parse its output, irrespective of whether this command exists. In
-       * particular, this method requires the DnsClient module which is only available
-       * on Windows 8/Server 2012 and later. Currently, this will only parse valid
-       * nameserver entries from the command output and will ignore all other output
-       * without complaining.
-       *
-       * Note that the previous section implies that this may return an empty
-       * `Config` object if no valid nameserver entries can be found.
-       *
-       * @param ?string $command (advanced) should not be given (NULL) unless you know what you're doing
-       * @return self
-       * @link https://learn.microsoft.com/en-us/powershell/module/dnsclient/get-dnsclientserveraddress
-       */
+    /**
+     * Loads the DNS configurations using Windows PowerShell
+     *
+     * Note that this method blocks while loading the given command and should
+     * thus be used with care! While this should be relatively fast for normal
+     * PowerShell commands, it remains unknown if this may block under certain
+     * circumstances. In particular, this method should only be executed before
+     * the loop starts, not while it is running.
+     *
+     * Note that this method will only try to execute the given command and try to
+     * parse its output, irrespective of whether this command exists. In
+     * particular, this method requires the DnsClient module which is only available
+     * on Windows 8/Server 2012 and later. Currently, this will only parse valid
+     * nameserver entries from the command output and will ignore all other output
+     * without complaining.
+     *
+     * Note that the previous section implies that this may return an empty
+     * `Config` object if no valid nameserver entries can be found.
+     *
+     * @param ?string $command (advanced) should not be given (NULL) unless you know what you're doing
+     * @return self
+     * @link https://learn.microsoft.com/en-us/powershell/module/dnsclient/get-dnsclientserveraddress
+     */
     public static function loadPowershellBlocking($command = null)
     {
-        $contents = shell_exec($command === null ? 'powershell -NoLogo -NoProfile -NonInteractive -Command "Get-DnsClientServerAddress | Select-Object -ExpandProperty ServerAddresses"' : $command);
+        $contents = shell_exec($command === null ? 'powershell -NoLogo -NoProfile -NonInteractive -Command "Get-DnsClientServerAddress | Select-Object -ExpandProperty ServerAddresses" 2>nul' : $command);
 
         $config = new self();
-        if ($contents !== null) {
+        if (is_string($contents)) {
             foreach (explode("\n", $contents) as $line) {
                 $ip = trim($line);
                 if ($ip === '' || @inet_pton($ip) === false) {
@@ -170,7 +176,7 @@ final class Config
      * parse its output, irrespective of whether this command exists. In
      * particular, this command is only available on Windows. Currently, this
      * will only parse valid nameserver entries from the command output and will
-     * ignore all other output swithout complaining.
+     * ignore all other output without complaining.
      *
      * Note that WMIC has been deprecated and removed in recent Windows versions
      * (Windows 11 24H2+). Consider using loadPowershellBlocking() instead.
@@ -192,6 +198,29 @@ final class Config
         $config->nameservers = $matches[1];
 
         return $config;
+    }
+
+    /**
+     * Checks whether the WMIC executable is available on this Windows system
+     *
+     * WMIC is a "Feature on Demand" since Windows 11 24H2 / Server 2025 and
+     * is no longer installed by default. Spawning a missing command via
+     * `shell_exec()` would make cmd.exe print an error message, so we check
+     * for the executable first and simply skip WMIC if it is not present.
+     *
+     * @return bool
+     */
+    private static function isWmicAvailable()
+    {
+        $root = getenv('SystemRoot');
+        if ($root === false || $root === '') {
+            $root = getenv('WINDIR');
+        }
+        if ($root === false || $root === '') {
+            $root = 'C:\\Windows';
+        }
+
+        return @is_file($root . '\\System32\\wbem\\wmic.exe');
     }
 
     public $nameservers = array();

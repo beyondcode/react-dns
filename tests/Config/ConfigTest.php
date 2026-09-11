@@ -222,6 +222,20 @@ nameserver localhost
         $this->assertEquals([], $config->nameservers);
     }
 
+    public function testWmicReturnsEmptyWhenCommandDoesNotExist()
+    {
+        $config = Config::loadWmicBlocking($this->missingCommand());
+
+        $this->assertEquals([], $config->nameservers);
+    }
+
+    public function testPowershellReturnsEmptyWhenCommandDoesNotExist()
+    {
+        $config = Config::loadPowershellBlocking($this->missingCommand());
+
+        $this->assertEquals([], $config->nameservers);
+    }
+
     public function testPowershellFallbackReturnsValidResults()
     {
         $contents = "192.168.2.1\n8.8.8.8";
@@ -308,5 +322,11 @@ ACE,
     private function echoCommand($output)
     {
         return 'echo ' . escapeshellarg($output);
+    }
+
+    private function missingCommand()
+    {
+        // simulate a command that is not installed (like wmic on Windows 11 24H2+)
+        return 'react-dns-command-does-not-exist-' . mt_rand() . ' 2>' . (DIRECTORY_SEPARATOR === '\\' ? 'nul' : '/dev/null');
     }
 }
